@@ -136,3 +136,6 @@ Conclusion
 This project demonstrates how HTN planning can be used in games.
 
 The AI guard reasons hierarchically, chooses actions based on conditions, and successfully protects the village through intelligent planning.
+## Correctness checks
+
+Run `python -m unittest -v test_planner.py`. Failed methods roll back their state, primitive steps, and tree edges before another method is tried. A failed plan leaves the caller state unchanged; a successful plan commits the final state. A depth limit prevents cyclic methods from recursing indefinitely.

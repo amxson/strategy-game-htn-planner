@@ -1,47 +1,57 @@
+from copy import deepcopy
+
+
 class HTNPlanner:
-    def __init__(self, methods, operators):
+    def __init__(self, methods, operators, max_depth=200):
         self.methods = methods
         self.operators = operators
+        self.max_depth = max_depth
         self.tree = []
 
     def plan(self, tasks, state):
-        plan = []
-        success = self._seek_plan(tasks, state, plan, "ROOT")
-        if success:
-            return plan
-        return None
+        """Commit a successful branch; leave caller state unchanged on failure."""
+        self.tree = []
+        result = self._seek_plan(tasks, deepcopy(state), [], [], "ROOT", 0)
+        if result is None:
+            return None
+        plan, final_state, tree = result
+        state.clear()
+        state.update(final_state)
+        self.tree = tree
+        return plan
 
-    def _seek_plan(self, tasks, state, plan, parent):
+    def _seek_plan(self, tasks, state, plan, tree, parent, depth):
         if not tasks:
-            return True
-
-        task = tasks[0]
-        remaining = tasks[1:]
-
-        task_name = task[0]
-
-        if task_name in self.operators:
-            precond, effect = self.operators[task_name]
-
-            if precond(state, *task[1:]):
-                self.tree.append((parent, task_name))
-                effect(state, *task[1:])
-                plan.append(task)
-                return self._seek_plan(remaining, state, plan, task_name)
-            else:
-                return False
-
-        if task_name in self.methods:
-            for method in self.methods[task_name]:
-                name, precond, subtasks = method
-
-                if precond(state, *task[1:]):
-                    self.tree.append((parent, task_name))
-                    self.tree.append((task_name, name))
-
-                    new_tasks = subtasks(state, *task[1:]) + remaining
-
-                    if self._seek_plan(new_tasks, state, plan, name):
-                        return True
-
-        return False
+            return plan, state, tree
+        if depth >= self.max_depth:
+            return None
+        task, remaining = tasks[0], tasks[1:]
+        name = task[0]
+        if name in self.operators:
+            precondition, effect = self.operators[name]
+            branch = deepcopy(state)
+            if precondition(branch, *task[1:]):
+                effect(branch, *task[1:])
+                return self._seek_plan(
+                    remaining,
+                    branch,
+                    plan + [task],
+                    tree + [(parent, name)],
+                    name,
+                    depth + 1,
+                )
+            return None
+        for method_name, precondition, subtasks in self.methods.get(name, []):
+            branch = deepcopy(state)
+            if precondition(branch, *task[1:]):
+                result = self._seek_plan(
+                    subtasks(branch, *task[1:]) + remaining,
+                    branch,
+                    plan[:],
+                    tree + [(parent, name), (name, method_name)],
+                    method_name,
+                    depth + 1,
+                )
+                if result is not None:
+                    return result
+        return None

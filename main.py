@@ -7,7 +7,7 @@ def print_plan(plan):
     print("\nFINAL PRIMITIVE PLAN")
     print("--------------------")
 
-    if not plan:
+    if plan is None:
         print("No valid plan found.")
         return
 
